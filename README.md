@@ -9,3 +9,8 @@ if so. However, this is purely for demonstration purposes.
 
 That's it.
 
+## Example use
+
+Here's what happens when you load it.
+
+![Screenshot of loading the module](https://raw.githubusercontent.com/gerph/riscos-vectortrap-example/refs/heads/master/LoadingTheModule.png)
