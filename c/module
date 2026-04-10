@@ -1,0 +1,100 @@
+/*******************************************************************
+ * File:        module
+ * Purpose:     VTrap module interface
+ * Author:      Gerph
+ ******************************************************************/
+
+#include <ctype.h>
+#include <stdbool.h>
+#include <stdlib.h>
+#include <stdio.h>
+
+#include "kernel.h"
+#include "modhead.h"
+
+#include "swis.h"
+#include "riscos/Vectors.h"
+
+#define DEBUG
+
+#ifdef DEBUG
+#define dprintf if (1) printf
+#else
+#define dprintf if (0) printf
+#endif
+
+
+/***************************************************************************
+ * Function:     Mod_Init
+ * Description:  Initialise the module, setting up vectors, callbacks and
+ *               any other parts of the system necessary for the module to
+ *               function.
+ * Parameters:   tail        = pointer to command line (control terminated)
+ *               podule_base = address of podule module was started from, or
+ *                             NULL if none
+ *               pw          = private word for module
+ * On exit:      Return NULL for successful initialisation, or a pointer to
+ *               an error block if the module could not start properly.
+ **************************************************************************/
+_kernel_oserror *Mod_Init(const char *tail, int podule_base, void *pw)
+{
+    _swix(OS_Claim, _INR(0,2), WrchV, VectorTrap_Entry, pw);
+    dprintf("Module VTrap initialised\n");
+    return NULL;
+}
+
+
+/***************************************************************************
+ * Function:     Mod_Final
+ * Description:  Finalise the module, shutting down any systems necessary,
+ *               freeing vectors and releasing workspace
+ * Parameters:   fatal       = fatality indicator; 1 if fatal, 0 if
+ *                             reinitialising
+ *               podule_base = address of podule module was started from, or
+ *                             NULL if none
+ *               pw          = private word for module
+ * On exit:      Return 0 for successful finalisation, or a pointer to an
+ *               error block if module was not shutdown properly.
+ **************************************************************************/
+_kernel_oserror *Mod_Final(int fatal, int podule_base, void *pw)
+{
+    dprintf("Module VTrap dying\n");
+    _swix(OS_Release, _INR(0,2), WrchV, VectorTrap_Entry, pw);
+    return NULL;
+}
+
+static bool upper_next = false;
+
+/***************************************************************************
+ * Function:     VectorTrap_Handler
+ * Description:  Vector traps handler function
+ * Parameters:   r      = pointer to register block on entry
+ *               pw     = private word for module
+ *               trap   = pointer to function to call to pass on vector
+ *               trappw = private word to pass to trap function
+ * On exit:      Update r to alter return values
+ *               Return NULL to return from vector (claiming it)
+ *               Return VECTORTRAP_PASSON to return pass on to next claimant
+ *               Return error pointer to return with V set and error in R0
+ **************************************************************************/
+_kernel_oserror *VectorTrap_Handler(_kernel_swi_regs *r, void *pw,
+                                    vectortrap_f trap, void *trappw)
+{
+    _kernel_oserror *err;
+    _kernel_swi_regs newregs;
+    char c = r->r[0];
+    if (upper_next)
+    {
+        /* This is a part that we modify registers */
+        upper_next = false;
+        newregs = *r;
+        newregs.r[0] = toupper(c);
+        err = trap(&newregs, trappw);
+        return err;
+    }
+    /* This is the regular code path */
+    if (c == 'a' || c == 'e' || c == 'i' || c == 'o' || c == 'u')
+        upper_next = true;
+    return VECTORTRAP_PASSON;
+}
+
